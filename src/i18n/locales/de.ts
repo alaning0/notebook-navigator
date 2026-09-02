@@ -97,6 +97,11 @@ export const STRINGS_DE = {
             message: 'Datei {filename} existiert nicht. Möchtest du sie erstellen?',
             confirmButton: 'Erstellen'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: 'Kalender-Tastenkürzel',
             items: [

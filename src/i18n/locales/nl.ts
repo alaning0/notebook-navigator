@@ -99,6 +99,11 @@ export const STRINGS_NL = {
             message: 'Bestand {filename} bestaat niet. Wil je het aanmaken?',
             confirmButton: 'Aanmaken'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: 'Kalendersneltoetsen',
             items: [

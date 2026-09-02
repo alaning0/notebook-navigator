@@ -1129,3 +1129,102 @@ button.nn-navigation-calendar-day {
 .nn-calendar-right-sidebar-content {
     padding: 10px 12px;
 }
+
+.nn-calendar-right-sidebar {
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.nn-calendar-right-sidebar-content {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.nn-calendar-right-sidebar .nn-navigation-calendar {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+}
+
+.nn-calendar-agenda {
+    flex: 1;
+    min-height: 80px;
+    overflow: auto;
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: var(--nn-calendar-border-width) solid var(--nn-theme-divider-border-color);
+}
+
+.nn-calendar-agenda-header {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.nn-calendar-agenda-empty {
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 8px 0;
+}
+
+.nn-calendar-agenda-day {
+    margin-bottom: 8px;
+}
+
+.nn-calendar-agenda-day-heading {
+    margin: 0 0 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.nn-calendar-agenda-day-today .nn-calendar-agenda-day-heading {
+    color: var(--text-accent);
+}
+
+.nn-calendar-agenda-items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.nn-calendar-agenda-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    width: 100%;
+    padding: 2px 4px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-normal);
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.nn-calendar-agenda-item:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.nn-calendar-agenda-time {
+    flex: 0 0 auto;
+    min-width: 4.5em;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.nn-calendar-agenda-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

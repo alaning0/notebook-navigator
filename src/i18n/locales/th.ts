@@ -98,6 +98,11 @@ export const STRINGS_TH = {
             message: 'ไฟล์ {filename} ไม่มีอยู่ คุณต้องการสร้างหรือไม่?',
             confirmButton: 'สร้าง'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: 'ทางลัดปฏิทิน',
             items: [

@@ -99,6 +99,11 @@ export const STRINGS_UK = {
             message: 'Файл {filename} не існує. Бажаєте створити його?',
             confirmButton: 'Створити'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: 'Гарячі клавіші календаря',
             items: [

@@ -50,6 +50,8 @@ import { CalendarGrid } from './CalendarGrid';
 import { CalendarHeader } from './CalendarHeader';
 import { CalendarHoverTooltip } from './CalendarHoverTooltip';
 import { CalendarYearPanel } from './CalendarYearPanel';
+import { CalendarAgenda } from './CalendarAgenda';
+import { compareAgendaEvents, parseDailyNoteEvents, type CalendarAgendaEvent } from './parseDailyNoteEvents';
 import {
     createCalendarNotePathResolverContext,
     parseCalendarNoteDateFromPath,
@@ -219,6 +221,8 @@ export function Calendar({
     );
     const [cursorDate, setCursorDate] = useState<MomentInstance | null>(() => initialCursorDate);
     const [yearPanelYear, setYearPanelYear] = useState<number | null>(() => initialCursorDate?.year() ?? null);
+    const [selectedAgendaDayIso, setSelectedAgendaDayIso] = useState<string | null>(null);
+    const [agendaEvents, setAgendaEvents] = useState<CalendarAgendaEvent[]>([]);
     const todayIso = useLocalDayKey();
     const [activeEditorFilePath, setActiveEditorFilePath] = useState<string | null>(
         () => resolveActiveEditorFilePath(app.workspace) ?? null
@@ -424,11 +428,13 @@ export function Calendar({
         const createRef = app.vault.on('create', onVaultUpdate);
         const deleteRef = app.vault.on('delete', onVaultUpdate);
         const renameRef = app.vault.on('rename', onVaultUpdate);
+        const modifyRef = app.vault.on('modify', onVaultUpdate);
 
         return () => {
             app.vault.offref(createRef);
             app.vault.offref(deleteRef);
             app.vault.offref(renameRef);
+            app.vault.offref(modifyRef);
             if (typeof window !== 'undefined' && vaultVersionDebounceRef.current !== null) {
                 window.clearTimeout(vaultVersionDebounceRef.current);
                 vaultVersionDebounceRef.current = null;
@@ -1174,6 +1180,7 @@ export function Calendar({
             const step = weeksToShow === 6 ? delta : delta * weeksToShow;
 
             setCursorDate(prev => (prev ?? momentApi().startOf('day').locale(displayLocale)).clone().add(step, unit).locale(displayLocale));
+            setSelectedAgendaDayIso(null);
             onNavigationAction?.();
         },
         [clearHoverTooltip, displayLocale, momentApi, onNavigationAction, weeksToShowSetting]
@@ -1186,6 +1193,7 @@ export function Calendar({
                 const baseYear = previousYear ?? cursorDate?.year() ?? momentApi?.().startOf('day').year() ?? new Date().getFullYear();
                 return baseYear + delta;
             });
+            setSelectedAgendaDayIso(null);
             onNavigationAction?.();
         },
         [clearHoverTooltip, cursorDate, momentApi, onNavigationAction]
@@ -1236,6 +1244,7 @@ export function Calendar({
             clearHoverTooltip();
             setCursorDate(date.clone().startOf('day').locale(displayLocale));
             setYearPanelYear(date.year());
+            setSelectedAgendaDayIso(null);
             onNavigationAction?.();
         },
         [clearHoverTooltip, displayLocale, handleDateFilterModifiedClick, onNavigationAction]
@@ -1312,6 +1321,7 @@ export function Calendar({
 
         clearHoverTooltip();
         setCursorDate(today.clone());
+        setSelectedAgendaDayIso(formatIsoDate(today));
         onNavigationAction?.();
 
         const note = getExistingDayNoteTarget(today);
@@ -1926,6 +1936,7 @@ export function Calendar({
                 return;
             }
 
+            setSelectedAgendaDayIso(day.iso);
             openOrCreateDailyNote(day.date);
         },
         [handleDateFilterModifiedClick, openOrCreateDailyNote]
@@ -1957,6 +1968,61 @@ export function Calendar({
             });
         },
         [settings.calendarMonthHighlights, showCalendarNoteContextMenu]
+    );
+
+    const currentMonthKeyForAgenda = cursorDate ? formatIsoDate(cursorDate).slice(0, 7) : null;
+
+    useEffect(() => {
+        if (!selectedAgendaDayIso || !currentMonthKeyForAgenda) {
+            return;
+        }
+        if (selectedAgendaDayIso.slice(0, 7) !== currentMonthKeyForAgenda) {
+            setSelectedAgendaDayIso(null);
+        }
+    }, [currentMonthKeyForAgenda, selectedAgendaDayIso]);
+
+    const inMonthDayNotes = useMemo(() => {
+        const notes: { iso: string; file: TFile }[] = [];
+        for (const week of weeks) {
+            for (const day of week.days) {
+                if (!day.inMonth || !day.note.visibleFile) {
+                    continue;
+                }
+                notes.push({ iso: day.iso, file: day.note.visibleFile });
+            }
+        }
+        return notes;
+    }, [weeks]);
+
+    useEffect(() => {
+        if (!isRightSidebar) {
+            setAgendaEvents([]);
+            return;
+        }
+
+        let cancelled = false;
+        runAsyncAction(async () => {
+            const nextEvents: CalendarAgendaEvent[] = [];
+            for (const note of inMonthDayNotes) {
+                const markdown = await app.vault.cachedRead(note.file);
+                nextEvents.push(...parseDailyNoteEvents(markdown, note.iso, note.file));
+            }
+            nextEvents.sort(compareAgendaEvents);
+            if (!cancelled) {
+                setAgendaEvents(nextEvents);
+            }
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [app.vault, inMonthDayNotes, isRightSidebar, vaultVersion]);
+
+    const handleAgendaOpenFile = useCallback(
+        (file: TFile) => {
+            void openFile(file);
+        },
+        [openFile]
     );
 
     if (!momentApi || !cursorDate) {
@@ -2075,6 +2141,15 @@ export function Calendar({
                     onYearPeriodContextMenu={handleYearPanelPeriodContextMenu}
                     onSelectYearMonth={handleSelectYearMonth}
                 />
+
+                {isRightSidebar ? (
+                    <CalendarAgenda
+                        events={agendaEvents}
+                        selectedDayIso={selectedAgendaDayIso}
+                        todayIso={todayIso}
+                        onOpenFile={handleAgendaOpenFile}
+                    />
+                ) : null}
             </div>
         </>
     );

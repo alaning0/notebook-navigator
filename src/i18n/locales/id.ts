@@ -98,6 +98,11 @@ export const STRINGS_ID = {
             message: 'File {filename} tidak ada. Apakah Anda ingin membuatnya?',
             confirmButton: 'Buat'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: 'Pintasan kalender',
             items: [

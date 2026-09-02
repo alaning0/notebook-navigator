@@ -98,6 +98,11 @@ export const STRINGS_PL = {
             message: 'Plik {filename} nie istnieje. Czy chcesz go utworzyć?',
             confirmButton: 'Utwórz'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: 'Skróty kalendarza',
             items: [

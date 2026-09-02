@@ -97,6 +97,11 @@ export const STRINGS_ES = {
             message: 'El archivo {filename} no existe. ¿Deseas crearlo?',
             confirmButton: 'Crear'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: 'Atajos del calendario',
             items: [

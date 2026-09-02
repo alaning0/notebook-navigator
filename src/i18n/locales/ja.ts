@@ -97,6 +97,11 @@ export const STRINGS_JA = {
             message: 'ファイル {filename} は存在しません。作成しますか？',
             confirmButton: '作成'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: 'カレンダーのショートカット',
             items: [
