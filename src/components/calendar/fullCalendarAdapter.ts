@@ -120,6 +120,13 @@ export function isFullCalendarAvailable(app: App): boolean {
 }
 
 /**
+ * Check if Full Calendar plugin exists (even if not yet initialized).
+ */
+export function isFullCalendarPluginPresent(app: App): boolean {
+    return getFullCalendarPlugin(app) !== null;
+}
+
+/**
  * Map day-of-week letter to JS day number (0=Sunday, 1=Monday, etc.)
  */
 const DAY_LETTER_TO_NUMBER: Record<string, number> = {
@@ -537,4 +544,58 @@ export async function ensureFullCalendarPopulated(app: App): Promise<void> {
     if (!cache.initialized) {
         await cache.populate();
     }
+}
+
+/**
+ * Wait for Full Calendar initialization with retry delays.
+ * Uses exponential backoff: 0ms, 100ms, 300ms, 1000ms.
+ * Returns true if initialized within timeout, false otherwise.
+ */
+export async function waitForFullCalendarInitialization(
+    app: App,
+    signal?: { cancelled: boolean }
+): Promise<boolean> {
+    const plugin = getFullCalendarPlugin(app);
+    if (!plugin) {
+        return false;
+    }
+    
+    const cache = plugin.cache;
+    
+    if (cache.initialized) {
+        return true;
+    }
+    
+    // Retry intervals: 0ms (immediate), 100ms, 300ms, 1000ms
+    const retryDelays = [0, 100, 300, 1000];
+    
+    for (const delay of retryDelays) {
+        if (signal?.cancelled) {
+            return false;
+        }
+        
+        if (delay > 0) {
+            await new Promise<void>(resolve => setTimeout(resolve, delay));
+        }
+        
+        if (signal?.cancelled) {
+            return false;
+        }
+        
+        // Try to trigger populate if not yet initialized
+        if (!cache.initialized) {
+            try {
+                await cache.populate();
+            } catch {
+                // populate() may fail or be a no-op; continue polling
+            }
+        }
+        
+        if (cache.initialized) {
+            return true;
+        }
+    }
+    
+    // Final check after all retries
+    return cache.initialized;
 }

@@ -55,8 +55,10 @@ import { compareAgendaEvents, parseDailyNoteEvents, type CalendarAgendaEvent } f
 import {
     getFullCalendarEventsForMonth,
     isFullCalendarAvailable,
+    isFullCalendarPluginPresent,
     subscribeToFullCalendarUpdates,
-    ensureFullCalendarPopulated
+    ensureFullCalendarPopulated,
+    waitForFullCalendarInitialization
 } from './fullCalendarAdapter';
 import {
     createCalendarNotePathResolverContext,
@@ -2006,40 +2008,71 @@ export function Calendar({
             return;
         }
 
-        let cancelled = false;
+        const signal = { cancelled: false };
         let unsubscribeFc: (() => void) | null = null;
 
+        const loadFallbackEvents = async (): Promise<CalendarAgendaEvent[]> => {
+            const nextEvents: CalendarAgendaEvent[] = [];
+            for (const note of inMonthDayNotes) {
+                if (signal.cancelled) break;
+                const markdown = await app.vault.cachedRead(note.file);
+                nextEvents.push(...parseDailyNoteEvents(markdown, note.iso, note.file));
+            }
+            nextEvents.sort(compareAgendaEvents);
+            return nextEvents;
+        };
+
+        const loadFcEvents = (monthKey: string): CalendarAgendaEvent[] => {
+            const fcEvents = getFullCalendarEventsForMonth(app, monthKey);
+            fcEvents.sort(compareAgendaEvents);
+            return fcEvents;
+        };
+
         const loadEvents = async () => {
-            // Determine the current month key for FC lookup
             const monthKey = currentMonthKeyForAgenda;
             if (!monthKey) {
-                if (!cancelled) {
+                if (!signal.cancelled) {
                     setAgendaEvents([]);
                 }
                 return;
             }
 
-            // Try Full Calendar first if available - use it as source of truth
+            // If FC is already available and initialized, use it as source of truth
             if (isFullCalendarAvailable(app)) {
                 await ensureFullCalendarPopulated(app);
-                const fcEvents = getFullCalendarEventsForMonth(app, monthKey);
-                // Always use FC events when plugin is available (even if empty for this month)
-                fcEvents.sort(compareAgendaEvents);
-                if (!cancelled) {
-                    setAgendaEvents(fcEvents);
+                if (!signal.cancelled) {
+                    setAgendaEvents(loadFcEvents(monthKey));
                 }
                 return;
             }
 
-            // Fallback: parse daily notes directly when FC is not available
-            const nextEvents: CalendarAgendaEvent[] = [];
-            for (const note of inMonthDayNotes) {
-                const markdown = await app.vault.cachedRead(note.file);
-                nextEvents.push(...parseDailyNoteEvents(markdown, note.iso, note.file));
+            // If FC plugin exists but isn't initialized yet, show fallback immediately
+            // then wait for FC init and refresh with FC events
+            if (isFullCalendarPluginPresent(app)) {
+                // Show fallback events immediately so the agenda isn't blank
+                if (inMonthDayNotes.length > 0 && !signal.cancelled) {
+                    const fallbackEvents = await loadFallbackEvents();
+                    if (!signal.cancelled) {
+                        setAgendaEvents(fallbackEvents);
+                    }
+                }
+
+                // Wait for FC to initialize (poll with backoff: 0ms, 100ms, 300ms, 1s)
+                const initialized = await waitForFullCalendarInitialization(app, signal);
+                if (signal.cancelled) return;
+
+                if (initialized) {
+                    // FC is now ready - use it as source of truth
+                    setAgendaEvents(loadFcEvents(monthKey));
+                }
+                // If init failed/timed out, keep the fallback events
+                return;
             }
-            nextEvents.sort(compareAgendaEvents);
-            if (!cancelled) {
-                setAgendaEvents(nextEvents);
+
+            // FC plugin not present - use daily notes fallback
+            const fallbackEvents = await loadFallbackEvents();
+            if (!signal.cancelled) {
+                setAgendaEvents(fallbackEvents);
             }
         };
 
@@ -2047,13 +2080,13 @@ export function Calendar({
 
         // Subscribe to Full Calendar updates if available
         unsubscribeFc = subscribeToFullCalendarUpdates(app, () => {
-            if (!cancelled) {
+            if (!signal.cancelled) {
                 runAsyncAction(loadEvents);
             }
         });
 
         return () => {
-            cancelled = true;
+            signal.cancelled = true;
             if (unsubscribeFc) {
                 unsubscribeFc();
             }
