@@ -62,16 +62,20 @@ function extractEventsSection(markdown: string): string | null {
     return section.join('\n');
 }
 
+const CALENDAR_FIELD_NAMES = new Set(['startTime', 'start', 'endTime', 'end', 'allDay']);
+
+function hasCalendarFields(fields: Record<string, string>): boolean {
+    return Object.keys(fields).some(key => CALENDAR_FIELD_NAMES.has(key));
+}
+
 export function parseDailyNoteEvents(markdown: string, dateIso: string, file: TFile): CalendarAgendaEvent[] {
     const section = extractEventsSection(markdown);
-    if (!section) {
-        return [];
-    }
+    const sectionScoped = section !== null;
+    const linesToParse = sectionScoped ? section.split('\n') : markdown.split(/\r?\n/u);
 
     const events: CalendarAgendaEvent[] = [];
-    const lines = section.split('\n');
     let eventIndex = 0;
-    for (const line of lines) {
+    for (const line of linesToParse) {
         const listMatch = LIST_ITEM_REGEX.exec(line);
         if (!listMatch) {
             continue;
@@ -79,6 +83,10 @@ export function parseDailyNoteEvents(markdown: string, dateIso: string, file: TF
 
         const { title, fields } = stripInlineFields(listMatch[1] ?? '');
         if (!title) {
+            continue;
+        }
+
+        if (!sectionScoped && !hasCalendarFields(fields)) {
             continue;
         }
 
