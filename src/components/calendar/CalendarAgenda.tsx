@@ -43,18 +43,11 @@ export const CalendarAgenda = React.memo(function CalendarAgenda({
     todayIso,
     onOpenFile
 }: CalendarAgendaProps) {
-    const todaySectionRef = useRef<HTMLElement | null>(null);
-
-    const visibleEvents = useMemo(() => {
-        if (!selectedDayIso) {
-            return events;
-        }
-        return events.filter(event => event.dateIso === selectedDayIso);
-    }, [events, selectedDayIso]);
+    const scrollTargetRef = useRef<HTMLElement | null>(null);
 
     const groups = useMemo(() => {
         const byDay = new Map<string, CalendarAgendaEvent[]>();
-        for (const event of visibleEvents) {
+        for (const event of events) {
             const existing = byDay.get(event.dateIso);
             if (existing) {
                 existing.push(event);
@@ -63,7 +56,7 @@ export const CalendarAgenda = React.memo(function CalendarAgenda({
             }
         }
 
-        if (!selectedDayIso && todayIso) {
+        if (todayIso) {
             const todayMonth = monthKeyFromIso(todayIso);
             const todayInLoadedMonth = Array.from(byDay.keys()).some(dateIso => monthKeyFromIso(dateIso) === todayMonth);
             if (todayInLoadedMonth && !byDay.has(todayIso)) {
@@ -71,15 +64,24 @@ export const CalendarAgenda = React.memo(function CalendarAgenda({
             }
         }
 
+        if (selectedDayIso && !byDay.has(selectedDayIso)) {
+            const selectedMonth = monthKeyFromIso(selectedDayIso);
+            const selectedInLoadedMonth = Array.from(byDay.keys()).some(dateIso => monthKeyFromIso(dateIso) === selectedMonth);
+            if (selectedInLoadedMonth) {
+                byDay.set(selectedDayIso, []);
+            }
+        }
+
         return Array.from(byDay.entries()).sort(([a], [b]) => a.localeCompare(b));
-    }, [visibleEvents, selectedDayIso, todayIso]);
+    }, [events, selectedDayIso, todayIso]);
 
     useEffect(() => {
-        if (selectedDayIso !== null) {
+        const targetIso = selectedDayIso ?? todayIso;
+        if (!targetIso) {
             return;
         }
 
-        const heading = todaySectionRef.current;
+        const heading = scrollTargetRef.current;
         if (!heading) {
             return;
         }
@@ -96,11 +98,16 @@ export const CalendarAgenda = React.memo(function CalendarAgenda({
                 <div className="nn-calendar-agenda-list">
                     {groups.map(([dateIso, dayEvents]) => {
                         const isToday = dateIso === todayIso;
+                        const isSelected = dateIso === selectedDayIso;
+                        const isScrollTarget = selectedDayIso ? isSelected : isToday;
+                        const classNames = ['nn-calendar-agenda-day'];
+                        if (isToday) classNames.push('nn-calendar-agenda-day-today');
+                        if (isSelected) classNames.push('nn-calendar-agenda-day-selected');
                         return (
                             <section
                                 key={dateIso}
-                                ref={isToday && selectedDayIso === null ? todaySectionRef : undefined}
-                                className={isToday ? 'nn-calendar-agenda-day nn-calendar-agenda-day-today' : 'nn-calendar-agenda-day'}
+                                ref={isScrollTarget ? scrollTargetRef : undefined}
+                                className={classNames.join(' ')}
                             >
                                 <h3 className="nn-calendar-agenda-day-heading">{formatDayHeading(dateIso)}</h3>
                                 <ul className="nn-calendar-agenda-items">
