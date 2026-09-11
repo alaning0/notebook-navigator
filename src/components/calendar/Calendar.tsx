@@ -53,6 +53,12 @@ import { CalendarYearPanel } from './CalendarYearPanel';
 import { CalendarAgenda } from './CalendarAgenda';
 import { compareAgendaEvents, parseDailyNoteEvents, type CalendarAgendaEvent } from './parseDailyNoteEvents';
 import {
+    getFullCalendarEventsForMonth,
+    isFullCalendarAvailable,
+    subscribeToFullCalendarUpdates,
+    ensureFullCalendarPopulated
+} from './fullCalendarAdapter';
+import {
     createCalendarNotePathResolverContext,
     parseCalendarNoteDateFromPath,
     resolveCalendarNotePath,
@@ -2001,7 +2007,31 @@ export function Calendar({
         }
 
         let cancelled = false;
-        runAsyncAction(async () => {
+        let unsubscribeFc: (() => void) | null = null;
+
+        const loadEvents = async () => {
+            // Determine the current month key for FC lookup
+            const monthKey = currentMonthKeyForAgenda;
+            if (!monthKey) {
+                if (!cancelled) {
+                    setAgendaEvents([]);
+                }
+                return;
+            }
+
+            // Try Full Calendar first if available - use it as source of truth
+            if (isFullCalendarAvailable(app)) {
+                await ensureFullCalendarPopulated(app);
+                const fcEvents = getFullCalendarEventsForMonth(app, monthKey);
+                // Always use FC events when plugin is available (even if empty for this month)
+                fcEvents.sort(compareAgendaEvents);
+                if (!cancelled) {
+                    setAgendaEvents(fcEvents);
+                }
+                return;
+            }
+
+            // Fallback: parse daily notes directly when FC is not available
             const nextEvents: CalendarAgendaEvent[] = [];
             for (const note of inMonthDayNotes) {
                 const markdown = await app.vault.cachedRead(note.file);
@@ -2011,12 +2041,24 @@ export function Calendar({
             if (!cancelled) {
                 setAgendaEvents(nextEvents);
             }
+        };
+
+        runAsyncAction(loadEvents);
+
+        // Subscribe to Full Calendar updates if available
+        unsubscribeFc = subscribeToFullCalendarUpdates(app, () => {
+            if (!cancelled) {
+                runAsyncAction(loadEvents);
+            }
         });
 
         return () => {
             cancelled = true;
+            if (unsubscribeFc) {
+                unsubscribeFc();
+            }
         };
-    }, [app.vault, inMonthDayNotes, isRightSidebar, vaultVersion]);
+    }, [app, app.vault, currentMonthKeyForAgenda, inMonthDayNotes, isRightSidebar, vaultVersion]);
 
     const handleAgendaOpenFile = useCallback(
         (file: TFile) => {

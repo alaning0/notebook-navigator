@@ -108,8 +108,9 @@ export const CalendarAgenda = React.memo(function CalendarAgenda({
                                         <li key={event.id}>
                                             <button
                                                 type="button"
-                                                className="nn-calendar-agenda-item"
-                                                onClick={() => onOpenFile(event.file)}
+                                                className={`nn-calendar-agenda-item${event.file ? '' : ' nn-calendar-agenda-item-no-file'}`}
+                                                onClick={() => event.file && onOpenFile(event.file)}
+                                                disabled={!event.file}
                                             >
                                                 <span className="nn-calendar-agenda-time">{formatEventTime(event)}</span>
                                                 <span className="nn-calendar-agenda-title">{event.title}</span>

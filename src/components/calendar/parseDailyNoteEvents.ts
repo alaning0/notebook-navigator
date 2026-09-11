@@ -12,7 +12,8 @@ export interface CalendarAgendaEvent {
     allDay: boolean;
     startTime: string | null;
     endTime: string | null;
-    file: TFile;
+    /** File associated with this event. May be null for remote/ICS calendar events. */
+    file: TFile | null;
 }
 
 const INLINE_FIELD_REGEX = /\[(\w+)::\s*([^\]]*)\]/gu;
