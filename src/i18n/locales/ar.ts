@@ -98,6 +98,11 @@ export const STRINGS_AR = {
             message: 'الملف {filename} غير موجود. هل تريد إنشاءه؟',
             confirmButton: 'إنشاء'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: 'اختصارات التقويم',
             items: [

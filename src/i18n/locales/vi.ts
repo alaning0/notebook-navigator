@@ -98,6 +98,11 @@ export const STRINGS_VI = {
             message: 'Tệp {filename} không tồn tại. Bạn có muốn tạo không?',
             confirmButton: 'Tạo'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: 'Lối tắt lịch',
             items: [

@@ -98,6 +98,11 @@ export const STRINGS_RU = {
             message: 'Файл {filename} не существует. Хотите создать его?',
             confirmButton: 'Создать'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: 'Горячие клавиши календаря',
             items: [

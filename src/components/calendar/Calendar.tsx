@@ -50,6 +50,16 @@ import { CalendarGrid } from './CalendarGrid';
 import { CalendarHeader } from './CalendarHeader';
 import { CalendarHoverTooltip } from './CalendarHoverTooltip';
 import { CalendarYearPanel } from './CalendarYearPanel';
+import { CalendarAgenda } from './CalendarAgenda';
+import { compareAgendaEvents, parseDailyNoteEvents, type CalendarAgendaEvent } from './parseDailyNoteEvents';
+import {
+    getFullCalendarEventsForMonth,
+    isFullCalendarAvailable,
+    isFullCalendarPluginPresent,
+    subscribeToFullCalendarUpdates,
+    ensureFullCalendarPopulated,
+    waitForFullCalendarInitialization
+} from './fullCalendarAdapter';
 import {
     createCalendarNotePathResolverContext,
     parseCalendarNoteDateFromPath,
@@ -219,6 +229,8 @@ export function Calendar({
     );
     const [cursorDate, setCursorDate] = useState<MomentInstance | null>(() => initialCursorDate);
     const [yearPanelYear, setYearPanelYear] = useState<number | null>(() => initialCursorDate?.year() ?? null);
+    const [selectedAgendaDayIso, setSelectedAgendaDayIso] = useState<string | null>(null);
+    const [agendaEvents, setAgendaEvents] = useState<CalendarAgendaEvent[]>([]);
     const todayIso = useLocalDayKey();
     const [activeEditorFilePath, setActiveEditorFilePath] = useState<string | null>(
         () => resolveActiveEditorFilePath(app.workspace) ?? null
@@ -424,11 +436,13 @@ export function Calendar({
         const createRef = app.vault.on('create', onVaultUpdate);
         const deleteRef = app.vault.on('delete', onVaultUpdate);
         const renameRef = app.vault.on('rename', onVaultUpdate);
+        const modifyRef = app.vault.on('modify', onVaultUpdate);
 
         return () => {
             app.vault.offref(createRef);
             app.vault.offref(deleteRef);
             app.vault.offref(renameRef);
+            app.vault.offref(modifyRef);
             if (typeof window !== 'undefined' && vaultVersionDebounceRef.current !== null) {
                 window.clearTimeout(vaultVersionDebounceRef.current);
                 vaultVersionDebounceRef.current = null;
@@ -1174,6 +1188,7 @@ export function Calendar({
             const step = weeksToShow === 6 ? delta : delta * weeksToShow;
 
             setCursorDate(prev => (prev ?? momentApi().startOf('day').locale(displayLocale)).clone().add(step, unit).locale(displayLocale));
+            setSelectedAgendaDayIso(null);
             onNavigationAction?.();
         },
         [clearHoverTooltip, displayLocale, momentApi, onNavigationAction, weeksToShowSetting]
@@ -1186,6 +1201,7 @@ export function Calendar({
                 const baseYear = previousYear ?? cursorDate?.year() ?? momentApi?.().startOf('day').year() ?? new Date().getFullYear();
                 return baseYear + delta;
             });
+            setSelectedAgendaDayIso(null);
             onNavigationAction?.();
         },
         [clearHoverTooltip, cursorDate, momentApi, onNavigationAction]
@@ -1236,6 +1252,7 @@ export function Calendar({
             clearHoverTooltip();
             setCursorDate(date.clone().startOf('day').locale(displayLocale));
             setYearPanelYear(date.year());
+            setSelectedAgendaDayIso(null);
             onNavigationAction?.();
         },
         [clearHoverTooltip, displayLocale, handleDateFilterModifiedClick, onNavigationAction]
@@ -1312,6 +1329,7 @@ export function Calendar({
 
         clearHoverTooltip();
         setCursorDate(today.clone());
+        setSelectedAgendaDayIso(formatIsoDate(today));
         onNavigationAction?.();
 
         const note = getExistingDayNoteTarget(today);
@@ -1926,6 +1944,7 @@ export function Calendar({
                 return;
             }
 
+            setSelectedAgendaDayIso(day.iso);
             openOrCreateDailyNote(day.date);
         },
         [handleDateFilterModifiedClick, openOrCreateDailyNote]
@@ -1957,6 +1976,128 @@ export function Calendar({
             });
         },
         [settings.calendarMonthHighlights, showCalendarNoteContextMenu]
+    );
+
+    const currentMonthKeyForAgenda = cursorDate ? formatIsoDate(cursorDate).slice(0, 7) : null;
+
+    useEffect(() => {
+        if (!selectedAgendaDayIso || !currentMonthKeyForAgenda) {
+            return;
+        }
+        if (selectedAgendaDayIso.slice(0, 7) !== currentMonthKeyForAgenda) {
+            setSelectedAgendaDayIso(null);
+        }
+    }, [currentMonthKeyForAgenda, selectedAgendaDayIso]);
+
+    const inMonthDayNotes = useMemo(() => {
+        const notes: { iso: string; file: TFile }[] = [];
+        for (const week of weeks) {
+            for (const day of week.days) {
+                if (!day.inMonth || !day.note.visibleFile) {
+                    continue;
+                }
+                notes.push({ iso: day.iso, file: day.note.visibleFile });
+            }
+        }
+        return notes;
+    }, [weeks]);
+
+    useEffect(() => {
+        if (!isRightSidebar) {
+            setAgendaEvents([]);
+            return;
+        }
+
+        const signal = { cancelled: false };
+        let unsubscribeFc: (() => void) | null = null;
+
+        const loadFallbackEvents = async (): Promise<CalendarAgendaEvent[]> => {
+            const nextEvents: CalendarAgendaEvent[] = [];
+            for (const note of inMonthDayNotes) {
+                if (signal.cancelled) break;
+                const markdown = await app.vault.cachedRead(note.file);
+                nextEvents.push(...parseDailyNoteEvents(markdown, note.iso, note.file));
+            }
+            nextEvents.sort(compareAgendaEvents);
+            return nextEvents;
+        };
+
+        const loadFcEvents = (monthKey: string): CalendarAgendaEvent[] => {
+            const fcEvents = getFullCalendarEventsForMonth(app, monthKey);
+            fcEvents.sort(compareAgendaEvents);
+            return fcEvents;
+        };
+
+        const loadEvents = async () => {
+            const monthKey = currentMonthKeyForAgenda;
+            if (!monthKey) {
+                if (!signal.cancelled) {
+                    setAgendaEvents([]);
+                }
+                return;
+            }
+
+            // If FC is already available and initialized, use it as source of truth
+            if (isFullCalendarAvailable(app)) {
+                await ensureFullCalendarPopulated(app);
+                if (!signal.cancelled) {
+                    setAgendaEvents(loadFcEvents(monthKey));
+                }
+                return;
+            }
+
+            // If FC plugin exists but isn't initialized yet, show fallback immediately
+            // then wait for FC init and refresh with FC events
+            if (isFullCalendarPluginPresent(app)) {
+                // Show fallback events immediately so the agenda isn't blank
+                if (inMonthDayNotes.length > 0 && !signal.cancelled) {
+                    const fallbackEvents = await loadFallbackEvents();
+                    if (!signal.cancelled) {
+                        setAgendaEvents(fallbackEvents);
+                    }
+                }
+
+                // Wait for FC to initialize (poll with backoff: 0ms, 100ms, 300ms, 1s)
+                const initialized = await waitForFullCalendarInitialization(app, signal);
+                if (signal.cancelled) return;
+
+                if (initialized) {
+                    // FC is now ready - use it as source of truth
+                    setAgendaEvents(loadFcEvents(monthKey));
+                }
+                // If init failed/timed out, keep the fallback events
+                return;
+            }
+
+            // FC plugin not present - use daily notes fallback
+            const fallbackEvents = await loadFallbackEvents();
+            if (!signal.cancelled) {
+                setAgendaEvents(fallbackEvents);
+            }
+        };
+
+        runAsyncAction(loadEvents);
+
+        // Subscribe to Full Calendar updates if available
+        unsubscribeFc = subscribeToFullCalendarUpdates(app, () => {
+            if (!signal.cancelled) {
+                runAsyncAction(loadEvents);
+            }
+        });
+
+        return () => {
+            signal.cancelled = true;
+            if (unsubscribeFc) {
+                unsubscribeFc();
+            }
+        };
+    }, [app, app.vault, currentMonthKeyForAgenda, inMonthDayNotes, isRightSidebar, vaultVersion]);
+
+    const handleAgendaOpenFile = useCallback(
+        (file: TFile) => {
+            void openFile(file);
+        },
+        [openFile]
     );
 
     if (!momentApi || !cursorDate) {
@@ -2075,6 +2216,15 @@ export function Calendar({
                     onYearPeriodContextMenu={handleYearPanelPeriodContextMenu}
                     onSelectYearMonth={handleSelectYearMonth}
                 />
+
+                {isRightSidebar ? (
+                    <CalendarAgenda
+                        events={agendaEvents}
+                        selectedDayIso={selectedAgendaDayIso}
+                        todayIso={todayIso}
+                        onOpenFile={handleAgendaOpenFile}
+                    />
+                ) : null}
             </div>
         </>
     );

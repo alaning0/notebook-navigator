@@ -98,6 +98,11 @@ export const STRINGS_FR = {
             message: "Le fichier {filename} n'existe pas. Voulez-vous le créer ?",
             confirmButton: 'Créer'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: 'Raccourcis du calendrier',
             items: [

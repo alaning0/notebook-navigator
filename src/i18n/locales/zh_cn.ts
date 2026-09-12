@@ -97,6 +97,11 @@ export const STRINGS_ZH_CN = {
             message: '文件 {filename} 不存在。是否创建？',
             confirmButton: '创建'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: '日历快捷键',
             items: [

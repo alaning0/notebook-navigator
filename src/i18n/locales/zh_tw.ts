@@ -97,6 +97,11 @@ export const STRINGS_ZH_TW = {
             message: '每日筆記 {filename} 不存在。是否建立？',
             confirmButton: '建立'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: '日曆快捷鍵',
             items: [

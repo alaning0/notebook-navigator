@@ -98,6 +98,11 @@ export const STRINGS_FA = {
             message: 'فایل {filename} وجود ندارد. آیا می‌خواهید آن را ایجاد کنید؟',
             confirmButton: 'ایجاد'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: 'میانبرهای تقویم',
             items: [

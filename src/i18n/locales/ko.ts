@@ -97,6 +97,11 @@ export const STRINGS_KO = {
             message: '파일 {filename}이(가) 존재하지 않습니다. 생성하시겠습니까?',
             confirmButton: '생성'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: '캘린더 단축키',
             items: [

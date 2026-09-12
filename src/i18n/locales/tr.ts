@@ -98,6 +98,11 @@ export const STRINGS_TR = {
             message: '{filename} dosyası mevcut değil. Oluşturmak ister misiniz?',
             confirmButton: 'Oluştur'
         },
+        agenda: {
+            title: 'Agenda',
+            empty: 'No events',
+            allDay: 'All day'
+        },
         helpModal: {
             title: 'Takvim kısayolları',
             items: [
